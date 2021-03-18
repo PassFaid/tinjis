@@ -1,4 +1,4 @@
-use tide::Request;
+use tide::{Request,Response,StatusCode};
 use tide::prelude::*;
 use tide::log::LevelFilter::*;
 
@@ -24,5 +24,7 @@ async fn main() -> tide::Result<()> {
 async fn pay_invoice(mut req: Request<()>) -> tide::Result {
     let inv : Invoice = req.body_json().await?;
     tide::log::info!("paying {:?} invoice in {:?} for amount {:?}", inv.currency, inv.customer_id, inv.value);
-    Ok(json!(true).into())
+    let mut res = Response::new(StatusCode::Ok);
+    res.set_body(json!({"result": true}));
+    Ok(res)
 }

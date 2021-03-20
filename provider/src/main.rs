@@ -17,7 +17,7 @@ async fn main() -> tide::Result<()> {
     tide::log::with_level(Info);
     let mut app = tide::new();
     app.at("/api/pay").post(pay_invoice);
-    app.listen("127.0.0.1:8080").await?;
+    app.listen("0.0.0.0:8080").await?;
     Ok(())
 }
 

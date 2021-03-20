@@ -4,3 +4,9 @@ services:
     build: .
     ports:
      - "8000:8000"
+    environment:
+      PAYMENT_PROVIDER_ENDPOINT: "http://tinjis_provider_1:8080/api/pay"
+  provider:
+    build: ./provider
+    ports:
+     - "8080:8080"

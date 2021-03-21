@@ -1,0 +1,45 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: antaeus-deployment
+  labels:
+    app: antaeus
+spec:
+  selector:
+    matchLabels:
+      app: antaeus
+  template:
+    metadata:
+      labels:
+        app: antaeus
+    spec:
+      containers:
+      - name: antaeus
+        image: snazzybucket/antaeus:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PAYMENT_PROVIDER_ENDPOINT
+          value: "http://provider/api/pay"
+        livenessProbe:
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          httpGet:
+            port: 8000
+            path: "/rest/health"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: antaeus
+  labels:
+    app: antaeus
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 8000
+  selector:
+    app: antaeus
+---

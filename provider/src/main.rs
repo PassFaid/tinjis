@@ -16,6 +16,11 @@ struct Invoice {
 async fn main() -> tide::Result<()> {
     tide::log::with_level(Info);
     let mut app = tide::new();
+
+    app.at("/health").get(|_| async {
+        Ok(json!("ok"))
+    });
+
     app.at("/api/pay").post(pay_invoice);
     app.listen("0.0.0.0:8080").await?;
     Ok(())

@@ -15,16 +15,18 @@ struct Invoice {
 }
 
 fn invoices() -> Result<Vec<Invoice>> {
-    let invoice = env::var("INVOICEURL").unwrap_or("http://localhost:8000/rest/v1/invoices".to_string());
+    let base = env::var("API_URL").unwrap_or("http://localhost:8000".to_string());
+    let invoice_url = base + "/rest/v1/invoices";
 
     let client = Client::new();
-    client.get(invoice.clone())
-        .send().with_context(|| format!("GET to {} failed", invoice.clone()))?
+    client.get(invoice_url.clone())
+        .send().with_context(|| format!("GET to {} failed", invoice_url.clone()))?
         .json::<Vec<Invoice>>().context("failed to parse invoices response")
 }
 
 fn pay() -> Result<bool> {
-    let pay_url = env::var("PAYURL").unwrap_or("http://localhost:8000/rest/v1/invoices/pay".to_string());
+    let base = env::var("API_URL").unwrap_or("http://localhost:8000".to_string());
+    let pay_url = base + "/rest/v1/invoices/pay";
 
     let client = Client::new();
     client.post(pay_url.clone())

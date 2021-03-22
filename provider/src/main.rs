@@ -30,6 +30,6 @@ async fn pay_invoice(mut req: Request<()>) -> tide::Result {
     let inv : Invoice = req.body_json().await?;
     tide::log::info!("paying {:?} invoice in {:?} for amount {:?}", inv.currency, inv.customer_id, inv.value);
     let mut res = Response::new(StatusCode::Ok);
-    res.set_body(json!({"result": true}));
+    res.set_body(json!({"result": rand::random::<bool>()}));
     Ok(res)
 }

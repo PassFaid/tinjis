@@ -1,21 +1,9 @@
 use std::{thread, time};
 use std::env;
 use reqwest::blocking::Client;
-use std::error::Error;
+use anyhow::*;
+
 use serde::{Deserialize, Serialize};
-
-#[macro_use]
-extern crate simple_error;
-
-#[derive(Debug, Default)]
-struct UnknownErr;
-
-impl std::fmt::Display for UnknownErr {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str("ERROR")
-    }
-}
-impl Error for UnknownErr {}
 
 // {"id":1,"customerId":1,"amount":{"value":70.03,"currency":"USD"},"status":"PAID"}
 #[derive(Debug, Serialize, Deserialize)]
@@ -26,113 +14,80 @@ struct Invoice {
     status: String,
 }
 
-fn invoices() -> Result<Vec<Invoice>, Box<dyn std::error::Error>> {
-    let pay_url = env::var("INVOICEURL").unwrap_or("http://localhost:8000/rest/v1/invoices".to_string());
+fn invoices() -> Result<Vec<Invoice>> {
+    let invoice = env::var("INVOICEURL").unwrap_or("http://localhost:8000/rest/v1/invoices".to_string());
 
     let client = Client::new();
-    let res = client.get(pay_url)
-        .send();
-
-    match res {
-        Ok(_res) => {
-            match _res.json::<Vec<Invoice>>() {
-                Ok(inv) => {
-                    Ok(inv)
-                }
-                Err(err) => {
-                    println!("{:#?}", err.to_string());
-                    bail!("couldn't parse response");
-                }
-            }
-        }
-        Err(err) => {
-            println!("{:#?}", err.to_string());
-            bail!("pay request failed");
-        }
-    }
+    client.get(invoice.clone())
+        .send().with_context(|| format!("GET to {} failed", invoice.clone()))?
+        .json::<Vec<Invoice>>().context("failed to parse invoices response")
 }
 
-fn pay() -> Result<bool, Box<dyn std::error::Error>> {
+fn pay() -> Result<bool> {
     let pay_url = env::var("PAYURL").unwrap_or("http://localhost:8000/rest/v1/invoices/pay".to_string());
 
     let client = Client::new();
-    let res = client.post(pay_url)
-        .send();
-
-    match res {
-        Ok(_res) => {
-            match _res.json::<bool>() {
-                Ok(_bool) => {
-                    Ok(_bool)
-                }
-                Err(_err) => {
-                    bail!("couldn't parse response");
-                }
-            }
-        }
-        Err(err) => {
-            println!("{:#?}", err.to_string());
-            bail!("pay request failed");
-        }
-    }
+    client.post(pay_url.clone())
+        .send().with_context(|| format!("POST to {} failed", pay_url.clone()))?
+        .json::<bool>().context("failed to parse pay response")
 }
 
-fn retry() -> Result<bool, Box<dyn std::error::Error>> {
-    let max_retries = 30;
-    let mut res : Result<bool, Box<dyn std::error::Error>> = Err(Box::new(UnknownErr));
-    for i in 1..max_retries {
-        let res_ = pay();
-        match res_ {
-            Ok(_bool) => {
-                res = Ok(_bool);
-                break;
-            }
-            Err(err) => {
-                println!("{} retries left", (max_retries - i).to_string());
-                let ms = time::Duration::from_millis(1000*i);
+fn retry<T, F: Fn() -> Result<T> > (max_retries: u64, f: F) -> Result<T> {
+    let res = f();
+    match res {
+        Ok(_) => {
+            res
+        }
+        Err(err) => {
+            if max_retries <= 0 {
+                Err(err)
+            } else {
+                let next_retries = max_retries - 1;
+                println!("{} retries left", (next_retries).to_string());
+                let ms = time::Duration::from_millis(10000);
                 println!("sleeping for {:?}", ms);
                 thread::sleep(ms);
-                res = Err(err)
+                retry(next_retries, f)
             }
         }
     }
-    res
 }
 
 fn count_paid(invs : Vec<Invoice>) -> usize {
     invs.iter().filter(|&x| x.status == "PAID").count()
 }
 
-fn check_invoices(invs : Vec<Invoice>) -> Result<usize, String> {
+fn check_invoices(invs : Vec<Invoice>) -> Result<usize> {
     let paid = count_paid(invs);
-    if paid > 2 {
+    if paid > 2 { // There are 2 paid invoices in the db already
         Ok(paid)
     } else {
-        Err("No invoices were paid".to_string())
+        Err(anyhow!("No invoices were paid"))
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    std::process::exit(match retry() {
-        Ok(paid) => {
-            if paid {
-                println!("All invoices paid, response: {:#?}", paid);
-                0
-            } else {
-                let inv = invoices()?;
-                let res = check_invoices(inv);
-                match res {
-                    Ok(paid_count) => {
-                        println!("Amount of paid invoices: {:#?}", paid_count);
-                        0
-                    }
-                    Err(err) => {
-                        println!("{:#?}", err);
-                        1
-                    }
-                }
-            }
-        }
+fn test_pay() -> Result<()> {
+    let max_retries = env::var("MAX_RETRIES").unwrap_or("".to_string());
+    let retry_count = max_retries.parse::<u64>().unwrap_or(30);
+
+    let orig_invs = retry(retry_count, invoices).context("Initial get to invoices failed")?;
+    println!("Intial count of paid invoices: {:#?}", count_paid(orig_invs));
+
+    let paid = retry(retry_count, pay).context("Attempt to pay invoices failed")?;
+    if paid {
+        println!("All invoices paid, response: {:#?}", paid);
+        Ok(())
+    } else {
+        let inv = retry(retry_count, invoices).context("Failed to get updated invoices")?;
+        let new_count = check_invoices(inv)?;
+        println!("Amount of paid invoices: {:#?}", new_count);
+        Ok(())
+    }
+}
+
+fn main() -> Result<()> {
+    std::process::exit(match test_pay() {
+        Ok(()) => 0,
         Err(err) => {
             println!("{:#?}", err);
             1

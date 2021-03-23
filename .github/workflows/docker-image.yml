@@ -43,6 +43,12 @@ jobs:
       id: test-in-cluster-network
       run: |
         kubectl run testclient --env="MAX_RETRIES=30" --env="API_URL=http://antaeus" --restart=Never --rm -i --image snazzybucket/testclient:latest
+    - name: Print logs on failure
+      if: ${{ failure() }}
+      id: get-logs
+      run: |
+        kubectl logs -l app=antaeus
+        kubectl logs -l app=provider
     - name: Test pay in via ingress
       id: test-in-with-ingress
       run: |

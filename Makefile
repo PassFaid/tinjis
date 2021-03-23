@@ -1,6 +1,7 @@
 render-k8s-yaml:
 	dhall-to-yaml --generated-comment --documents --file deploy/dhall/deployment.dhall
 	dhall-to-yaml --generated-comment --documents --file deploy/dhall/service.dhall
+	dhall-to-yaml --generated-comment --documents --file deploy/dhall/ingress.dhall
 
 DHALL_IN_DOCKER := \
 	@docker run --rm \
@@ -11,3 +12,4 @@ DHALL_IN_DOCKER := \
 render-k8s-yaml-docker:
 	$(DHALL_IN_DOCKER) --generated-comment --documents --file deploy/dhall/deployment.dhall
 	$(DHALL_IN_DOCKER) --generated-comment --documents --file deploy/dhall/service.dhall
+	$(DHALL_IN_DOCKER) --generated-comment --documents --file deploy/dhall/ingress.dhall

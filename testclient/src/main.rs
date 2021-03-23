@@ -45,6 +45,7 @@ fn retry<T, F: Fn() -> Result<T> > (max_retries: u64, f: F) -> Result<T> {
                 Err(err)
             } else {
                 let next_retries = max_retries - 1;
+                println!("{:?}", err);
                 println!("{} retries left", (next_retries).to_string());
                 let ms = time::Duration::from_millis(10000);
                 println!("sleeping for {:?}", ms);

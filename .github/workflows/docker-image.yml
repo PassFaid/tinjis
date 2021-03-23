@@ -5,12 +5,15 @@ on:
     branches: '**'
 
 jobs:
-  build-antaeus:
+  build-docker-images:
+    strategy:
+      matrix:
+        service: [antaeus, provider, testclient]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag snazzybucket/antaeus:latest
+    - name: Build the ${{ matrix.service }} Docker image
+      run: make docker-build-${{ matrix.service }}
     - name: Login to DockerHub
       uses: docker/login-action@v1
       with:
@@ -18,37 +21,9 @@ jobs:
         password: ${{ secrets.DOCKERHUB_TOKEN }}
     - name: Push the Docker image
       run: |
-        docker push snazzybucket/antaeus:latest
-  build-provider:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Build the Docker image
-      run: docker build ./provider --file ./provider/Dockerfile --tag snazzybucket/provider:latest
-    - name: Login to DockerHub
-      uses: docker/login-action@v1
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - name: Push the Docker image
-      run: |
-        docker push snazzybucket/provider:latest
-  build-testclient:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Build the Docker image
-      run: docker build ./testclient --file ./testclient/Dockerfile --tag snazzybucket/testclient:latest
-    - name: Login to DockerHub
-      uses: docker/login-action@v1
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - name: Push the Docker image
-      run: |
-        docker push snazzybucket/testclient:latest
+        docker push snazzybucket/${{ matrix.service }}:latest
   test-k8s-dhall:
-    needs: [build-antaeus, build-provider, build-testclient]
+    needs: [build-docker-images]
     runs-on: ubuntu-latest
     name: test dhall on microk8s
     steps:

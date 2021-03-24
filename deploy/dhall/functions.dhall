@@ -4,9 +4,15 @@ let Info =
 , image : Text
 , tag : Text
 , healthPath : Text
-, initialDelaySeconds : Natural
+, startupFailureThreshold : Natural
 , env : List { name : Text, value : Text }
 }
+
+let mkProbeBody = \(info : Info) ->
+  { httpGet = { path = info.healthPath, port = info.port }
+  , failureThreshold = 2
+  , periodSeconds = 10
+  }
 
 let mkDeployment = \(info : Info) ->
   { apiVersion = "apps/v1"
@@ -20,11 +26,9 @@ let mkDeployment = \(info : Info) ->
         =
         [ { env = info.env
           , image = "${info.image}:${info.tag}"
-          , livenessProbe =
-            { httpGet = { path = info.healthPath, port = info.port }
-            , initialDelaySeconds = info.initialDelaySeconds
-            , periodSeconds = 30
-            }
+          , livenessProbe = mkProbeBody info
+          , readinessProbe = mkProbeBody info
+          , startupProbe = (mkProbeBody info) with failureThreshold = info.startupFailureThreshold
           , name = info.name
           , ports = [ { containerPort = info.port } ]
           }

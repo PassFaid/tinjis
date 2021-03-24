@@ -6,7 +6,7 @@ let antaeusInfo =
   , image = "snazzybucket/antaeus"
   , tag = "latest"
   , healthPath = "/rest/health"
-  , initialDelaySeconds = 120
+  , startupFailureThreshold = 30
   , env =
     [ { name = "PAYMENT_PROVIDER_ENDPOINT"
       , value = "http://provider/api/pay"
@@ -20,7 +20,7 @@ let providerInfo =
   , image = "snazzybucket/provider"
   , tag = "latest"
   , healthPath = "/health"
-  , initialDelaySeconds = 30
+  , startupFailureThreshold = 3
   , env = [] : List { name : Text, value : Text }
   } : f.Info
 in

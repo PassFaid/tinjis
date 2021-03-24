@@ -24,7 +24,7 @@ There's also a test client that runs the above (source in the `/testclient` dir)
 kubectl run testclient --env="MAX_RETRIES=30" --env="API_URL=http://antaeus" --restart=Never --rm -i --image snazzybucket/testclient:latest
 ```
 
-where the value `API_URL` is a publicly available address of the antaeus service. I'm not sure about your network setup, but to see this client running both in kubernetes and externally via the ingress, you can take a look at the [Github Action job here](https://github.com/alexhumphreys/tinjis/runs/2178964320).
+which will run the test client inside the k8s network. Should you want to run it from elsewhere, the `API_URL` env var should be set to the publicly available address of the antaeus service. To see this client running both in kubernetes and externally via the ingress, you can take a look at the [Github Action job here](https://github.com/alexhumphreys/tinjis/runs/2178964320).
 
 ## Details
 
@@ -33,7 +33,7 @@ where the value `API_URL` is a publicly available address of the antaeus service
 The payment provider microservice is a Rust server located in the `/provider` dir. You can run both it and antaeus together with `docker-compose up`. It has two endpoints:
 
 - `GET /health`
-- `POST /api/pay`
+- `POST /api/pay` which expects a json body like '{ "currency": {}, "customer_id": 1, "value": 140.38 }'`
 
 ### `testclient`
 
@@ -45,7 +45,7 @@ then counts the paid invoices, does a pay, then checks to see if it's greater th
 
 ### kubernetes configs
 
-Both `antaeus` and `provider` have require similar Kubernetes yaml configs, so I use [`dhall`](https://dhall-lang.org/) to generate the configs for both. Check the `/deploy/dhall` dir for the source. You can generate the kubernetes yaml with:
+Both `antaeus` and `provider` require similar Kubernetes yaml configs, so I use [`dhall`](https://dhall-lang.org/) to generate the configs for both. Check the `/deploy/dhall` dir for the source. You can generate the kubernetes yaml with:
 
 ```
 make render-k8s-yaml-docker

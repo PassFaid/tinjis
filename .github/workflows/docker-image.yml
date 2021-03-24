@@ -38,7 +38,7 @@ jobs:
         kubectl get no
         kubectl get pods -A -o wide
         make render-k8s-yaml-docker
-        kubectl apply -f deploy/generated.yaml
+        make deploy
     - name: Test pay in k8s network
       id: test-in-cluster-network
       run: |

@@ -1,49 +1,81 @@
-# Preface
-
-We're really happy that you're considering to join us! Here's a challenge that will help us understand your skills and serve as a starting discussion point for the interview.
-
-We're not expecting that everything will be done perfectly as we value your time. You're encouraged to point out possible improvements during the interview though!
-
-Have fun!
-
-## The challenge
-
-Pleo runs most of its infrastructure in Kubernetes. It's a bunch of microservices talking to each other and performing various tasks like verifying card transactions, moving money around, paying invoices ...
-
-We would like to see that you both:
-- Know how to create a small microservice
-- Know how to wire it together with other services running in Kubernetes
-
-We're providing you with a small service (Antaeus) written in Kotlin that's used to charge a monthly subscription to our customers. The trick is, this service needs to call an external payment provider to make a charge and this is where you come in.
-
-You're expected to create a small payment microservice that Antaeus can call to pay the invoices. You can use the language of your choice. Your service should randomly succeed/fail to pay the invoice.
-
-On top of that, we would like to see Kubernetes scripts for deploying both Antaeus and your service into the cluster. This is how we will test that the solution works.
+# Tinjis
 
 ## Instructions
 
-Start by forking this repository. :)
+You'll need to have the following installed: `docker`, `docker-compose`, `make`, `kubectl`, and optionally [`dhall-to-yaml`](https://github.com/dhall-lang/dhall-haskell/releases/tag/1.38.0).
 
-1. Build and test Antaeus to make sure you know how the API works. We're providing a `docker-compose.yml` file that should help you run the app locally.
-2. Create your own service that Antaeus will use to pay the invoices. Use the `PAYMENT_PROVIDER_ENDPOINT` env variable to point Antaeus to your service.
-3. Your service will be called if you invoke `/rest/v1/invoices/pay` call on Antaeus. You can probably figure out which call returns the current status invoices by looking at the code ;)
-4. Kubernetes: Provide deployment scripts for both Antaeus and your service. Don't forget about Service resources so we can call Antaeus from outside the cluster and check the results.
-    - Bonus points if your scripts use liveness/readiness probes.
-5. **Discussion bonus points:** Use the README file to discuss how this setup could be improved for production environments. We're especially interested in:
-    1. How would a new deployment look like for these services? What kind of tools would you use?
-    2. If a developers needs to push updates to just one of the services, how can we grant that permission without allowing the same developer to deploy any other services running in K8s?
-    3. How do we prevent other services running in the cluster to talk to your service. Only Antaeus should be able to do it.
+Assuming you have a kubernetes (k8s) cluster (with ingress configured, and the ability to pull public images from dockerhub), and `kubectl` pointed at it, do the following to run the solution:
 
-## How to run
+1. Generate the kubernetes yaml files: `make render-k8s-yaml-docker`
+2. Apply it to kubernetes with: `make deploy`
+3. Wait for services to become available
 
-If you want to run Antaeus locally, we've prepared a docker compose file that should help you do it. Just run:
+For testing the solution, the configured ingress forwards all paths on port `80`, to the antaeus service, so assuming your k8s cluster is local and your ingress is configured to make port `80` available, the following should work:
+
 ```
-docker-compose up
+curl -v 127.0.0.1:80/rest/v1/invoices # check initial invoices
+curl -v 127.0.0.1:80/rest/v1/invoices/pay -X POST # pay some invoices
+curl -v 127.0.0.1:80/rest/v1/invoices # check to see if any have been paid
 ```
-and the app should build and start running (after a few minutes when gradle does its job)
 
-## How we'll test the solution
+There's also a test client that runs the above (source in the `/testclient` dir), which you can run with:
 
-1. We will use your scripts to deploy both services to our Kubernetes cluster.
-2. Run the pay endpoint on Antaeus to try and pay the invoices using your service.
-3. Fetch all the invoices from Antaeus and confirm that roughly 50% (remember, your app should randomly fail on some of the invoices) of them will have status "PAID".
+```
+kubectl run testclient --env="MAX_RETRIES=30" --env="API_URL=http://antaeus" --restart=Never --rm -i --image snazzybucket/testclient:latest
+```
+
+where the value `API_URL` is a publicly available address of the antaeus service. I'm not sure about your network setup, but to see this client running both in kubernetes and externally via the ingress, you can take a look at the [Github Action job here](https://github.com/alexhumphreys/tinjis/runs/2178964320).
+
+## Details
+
+### `provider`
+
+The payment provider microservice is a Rust server located in the `/provider` dir. You can run both it and antaeus together with `docker-compose up`. It has two endpoints:
+
+- `GET /health`
+- `POST /api/pay`
+
+### `testclient`
+
+The test client is Rust executable located in the `/testclient` dir. It retries the api until it is available,
+then counts the paid invoices, does a pay, then checks to see if it's greater than 2 (the initial number of paid invoices). It can be configured with:
+
+- `MAX_RETRIES` (default: `30`)
+- `API_URL` (default: `"http://localhost:8000"`)
+
+### kubernetes configs
+
+Both `antaeus` and `provider` have require similar Kubernetes yaml configs, so I use [`dhall`](https://dhall-lang.org/) to generate the configs for both. Check the `/deploy/dhall` dir for the source. You can generate the kubernetes yaml with:
+
+```
+make render-k8s-yaml-docker
+```
+
+which is pretty much just calling `dhall-to-yaml` serveral times, take a look in the `/Makefile` to see how exactly.
+
+To edit the defined variables, update the file `./deploy/dhall/microservices.dhall`.
+
+### Discussion bonus points
+
+There's definitely a few things I could improve.
+
+- installing microk8s in CI is slow/flakey.
+- antaeus in docker seems to be making gradle network requests on startup. Should probably be packaged as a fat jar or something similar.
+- testclient is flakey (can't tell the difference between a genuine network request/config error, and no updates happening because `provider` returned mostly `false`)
+- current the CI docker builds tag images only as `latest`, which would make rollbacks impossible. I'd probably switch to a `git describe` tag format.
+- there's currently only integration tests, no unit tests for the `provider` or `testclient`.
+- both services also are deployed together, it would be better if they could release independently.
+
+#### For a prod deployment...
+
+- I'd maybe use similar tools to this: Dhall to generate k8s configs. I've checked the output k8s yaml into the repo here in a gitops style, but that'd get a bit more complicated when using real version numbers. Also Dhall gets a bit cumbersome with really complicated k8s configs (can see a bit of that in how I handled the different probes for the antaeus and provider services), so could maybe use something else like Kustomize or Helm.
+- Expand the testclient to be like a post deploy smoke test, and roll back if it fails. And in production these might be real invoices with actual money, so the smoke test would need to behave accordingly.
+- Proper CI job that does the production deploy after tests/staging envs have passed.
+
+#### If a developers needs to push updates to just one of the services...
+
+I'd use some sort of RBAC to grant permissions to just the required resources (`get`/`update`/etc. on `deployments`, `pods`), though I'd hope this is for testing and that actual deployments are being done by CI and not devs with `kubectl` access.
+
+#### How do we prevent other services running in the cluster to talk to your service...
+
+I'd probably use a [`network policy`](https://kubernetes.io/docs/concepts/services-networking/network-policies/) to limit the access to just antaeus. Some authorization could also be added, though that would be added complexity.

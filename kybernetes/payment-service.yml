@@ -7,5 +7,5 @@ spec:
   ports:
   - protocol: TCP
     port: 9000
-   selector:
-     app: pleo-payment 
+  selector:
+     app: payment 

@@ -1,26 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: pleo-antaeus
+  name: pleo-antaeusdep
   labels:
-    app: antaeus
+    app: pleo-antaeusdep
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: antaeus
+      app: pleo-antaeus
   template:
     metadata:
       labels:
-        app: antaeus
+        app: pleo-antaeus
     spec:
       containers:
-      - name: antaeus
-        image: root_pleo-antaeus:latest
+      - name: pleo-antaeus
+        image: faidonpassias/magicalantaeus
         ports:
         - containerPort: 8000
         env:
         - name: PAYMENT_PROVIDER_ENDPOINT
-          value: "payment-service"
-
-
+          value: http://payment-service.default.svc.cluster.local:9000

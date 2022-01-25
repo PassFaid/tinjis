@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: pleo-payment
+  name: payment
   labels:
     app: payment
 spec:
@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: payment
-        image: payment-image:latest 
+        image: faidonpassias/magicalpayments  
         ports:
         - containerPort: 9000
 

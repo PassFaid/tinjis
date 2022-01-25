@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pleo-antaeus
+  labels:
+    app: antaeus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: antaeus
+  template:
+    metadata:
+      labels:
+        app: antaeus
+    spec:
+      containers:
+      - name: antaeus
+        image: root_pleo-antaeus:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PAYMENT_PROVIDER_ENDPOINT
+          value: "payment-service"
+
+

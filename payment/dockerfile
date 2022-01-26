@@ -1,5 +1,5 @@
 FROM node:latest
 EXPOSE 9000/tcp
 WORKDIR /home/node/app
-COPY payment2.js .
-CMD ["node", "payment2.js"]
+COPY ./payment/payment.js .
+CMD ["node", "payment.js"]

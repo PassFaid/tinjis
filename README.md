@@ -35,4 +35,6 @@ spec:
     - protocol: TCP
       port: 8000
 
+//taken from https://kubernetes.io/docs/concepts/services-networking/network-policies/ and adjusted it to the ecosystem of antaeus
 
+Hope to hear from you soon \o/ .
